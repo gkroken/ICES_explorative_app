@@ -6,13 +6,21 @@ sized the way the ICES total could realistically be held: 18 countries,
 13 years, ~7.8 M Table 1 rows and ~5.3 M Table 2 rows by default.
 
 ```bash
-docker build -t ices-vms-explorer .        # simulates data + builds cubes (~10 min)
-docker run --rm -p 3838:3838 ices-vms-explorer
+cp .env.example .env                       # add your CARTO basemap key (see Configuration)
+docker compose up --build                  # simulates data + builds cubes (~10 min)
 # open http://localhost:3838
 ```
 
-or `docker compose up --build`. Scale the data with
-`--build-arg ROWS_PER_YEAR=2000000` (rows of Table 1 per year, all countries).
+or without Compose:
+
+```bash
+docker build -t ices-vms-explorer .
+docker run --rm -p 3838:3838 -e CARTO_BASEMAP_KEY=your-key ices-vms-explorer
+```
+
+Scale the data with `--build-arg ROWS_PER_YEAR=2000000` (rows of Table 1 per
+year, all countries). The app runs without a CARTO key, but the Dark/Light
+basemaps are then watermarked.
 
 ![Map](docs/map.png)
 
@@ -97,8 +105,11 @@ like the real thing:
 ```bash
 Rscript sim/ingest_submission.R --table1 table1Save.csv --table2 table2Save.csv --out data
 Rscript sim/build_warehouse.R data
-DATA_DIR=$PWD/data Rscript -e "shiny::runApp('app', port = 3838)"
+CARTO_BASEMAP_KEY=your-key DATA_DIR=$PWD/data Rscript -e "shiny::runApp('app', port = 3838)"
 ```
+
+Instead of prefixing the command you can put `CARTO_BASEMAP_KEY=...` in an
+`.Renviron` file in the project folder (it is git-ignored).
 
 The ingest script decodes C-squares to centroids/grid indices/ICES rectangles,
 Morton-sorts and writes the same lake layout (CSV or the `.rds` outputs both
@@ -116,14 +127,36 @@ your lake.
 | `DUCKDB_MEMORY` | `2GB` | DuckDB memory limit |
 | `CACHE_MB` | `512` | result cache size |
 | `SQL_CONSOLE` | `true` | set `false` to hide the console |
+| `CARTO_BASEMAP_KEY` | – | free CARTO basemap key ([carto.com/basemaps/apikey](https://carto.com/basemaps/apikey)); without it the Dark/Light basemaps are watermarked |
 
 The SQL console runs on a DuckDB connection with `enable_external_access = false`,
 `allowed_directories` limited to the data folder, and a locked configuration.
+
+### The CARTO basemap key
+
+The key is passed in at **run time** and never committed or built into the image:
+
+* **Docker Compose** reads it from `.env` next to `docker-compose.yml`
+  (copy `.env.example` to `.env` and fill it in). `.env` is listed in
+  `.gitignore` and `.dockerignore`.
+* **`docker run`**: `-e CARTO_BASEMAP_KEY=...`.
+* **Local R**: `.Renviron` or a prefix on the command, as above.
+
+Do not set it with `ENV` or `ARG` in the Dockerfile: both end up in the image
+(`ARG` values are visible in `docker history`).
+
+The key is not a secret in the strict sense — it appears in the tile URLs the
+browser requests — but keeping it out of the repository protects your quota
+(free tier: 5 million tile requests a month). If a key ends up in git, create a
+new one and deactivate the old one on the CARTO basemaps dashboard; removing it
+from the code alone is not enough, since it stays in the history. CARTO and
+OpenStreetMap attribution must stay on the map.
 
 ## Layout
 
 ```
 Dockerfile, docker-compose.yml
+.env.example               template for .env (CARTO_BASEMAP_KEY)
 sim/simulate.py            Parquet lake generator (stage 1)
 sim/build_warehouse.R      cube pyramid + dimension tables (stage 2)
 sim/ingest_submission.R    real table1Save / table2Save -> lake

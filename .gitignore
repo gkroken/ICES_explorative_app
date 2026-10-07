@@ -1,0 +1,9 @@
+.env
+.Renviron
+.Rproj.user/
+.Rhistory
+.RData
+data/
+**/*.duckdb
+**/*.duckdb.wal
+**/__pycache__/

@@ -1,0 +1,9 @@
+data/
+**/*.duckdb
+**/*.duckdb.wal
+**/__pycache__/
+.git/
+*.Rproj.user/
+screenshots/
+.env
+.Renviron

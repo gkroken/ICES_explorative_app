@@ -1,0 +1,17 @@
+services:
+  explorer:
+    build:
+      context: .
+      args:
+        ROWS_PER_YEAR: 600000   # raise to 2-5M to stress-test an ICES-total-sized store
+        YEARS: 2013-2025
+    image: ices-vms-explorer
+    ports:
+      - "3838:3838"
+    environment:
+      DUCKDB_THREADS: "4"
+      DUCKDB_MEMORY: 2GB
+      CACHE_MB: "512"
+      SQL_CONSOLE: "true"
+      CARTO_BASEMAP_KEY: ${CARTO_BASEMAP_KEY:-}
+    restart: unless-stopped
